@@ -9,9 +9,13 @@ import android.support.annotation.Nullable;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.support.v7.widget.SearchView;
+import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Filter;
+import android.widget.Filterable;
 import android.widget.ProgressBar;
 
 import com.whackyapps.pallavgrover.techona.MyApplication;
@@ -21,16 +25,19 @@ import com.whackyapps.pallavgrover.techona.data.RemoteDataSource;
 import com.whackyapps.pallavgrover.techona.data.model.Food;
 import com.whackyapps.pallavgrover.techona.viewmodel.FoodListViewModel;
 
+import java.util.ArrayList;
 import java.util.List;
 
-public class FirstFragment extends android.support.v4.app.Fragment{
+public class FirstFragment extends android.support.v4.app.Fragment implements Filterable{
 
     public static final String TAG = "FirstFragment";
     private FoodListViewModel mListViewModel;
     private FoodListAdapter mFoodAdapter;
     private SwipeRefreshLayout mRefreshLayout;
-    private View RLGirlRoot;
+    private View root;
     private ProgressBar mLoadMorebar;
+    private SearchView mSearchView;
+    private FoodFilter foodFilter;
 
 
     public static FirstFragment newInstance() {
@@ -57,7 +64,31 @@ public class FirstFragment extends android.support.v4.app.Fragment{
         RecyclerView recyclerView = (RecyclerView) view.findViewById(R.id.recycler_view);
         recyclerView.setLayoutManager(new LinearLayoutManager(context,
                 LinearLayoutManager.VERTICAL, false));
-         mFoodAdapter = new FoodListAdapter();
+        mSearchView = view.findViewById(R.id.search_bar);
+        mSearchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                if (mFoodAdapter != null) {
+                    getFilter().filter(query);
+                    return true;
+                }
+                return false;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                if (mFoodAdapter != null) {
+                    getFilter().filter(newText);
+                    if(TextUtils.isEmpty(newText)){
+                        mListViewModel.refreshFoodData();
+                    }
+                    return true;
+                }
+
+                return false;
+            }
+        });
+        mFoodAdapter = new FoodListAdapter();
         recyclerView.setAdapter(mFoodAdapter);
         recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
@@ -67,7 +98,7 @@ public class FirstFragment extends android.support.v4.app.Fragment{
                 int lastPosition = layoutManager
                         .findLastVisibleItemPosition();
                 if (lastPosition == mFoodAdapter.getItemCount() - 1) {
-                    mListViewModel.loadNextPageGirls();
+                    mListViewModel.loadNextPageFood();
                 }
             }
         });
@@ -86,8 +117,8 @@ public class FirstFragment extends android.support.v4.app.Fragment{
                 android.R.color.holo_orange_light,
                 android.R.color.holo_red_light);
 
-        mLoadMorebar = (ProgressBar)view.findViewById(R.id.load_more_bar);
-        RLGirlRoot = view.findViewById(R.id.rl_girl_root);
+        mLoadMorebar = (ProgressBar) view.findViewById(R.id.load_more_bar);
+        root = view.findViewById(R.id.root_frag);
     }
 
     @Override
@@ -97,10 +128,9 @@ public class FirstFragment extends android.support.v4.app.Fragment{
     }
 
     private void subscribeUI() {
-        // 通过 ViewModelProviders 创建对应的 ZhihuListViewModel 对象
         FoodListViewModel.Factory factory = new FoodListViewModel
                 .Factory(MyApplication.getInstance()
-                , RemoteDataSource.getInstance());
+                , RemoteDataSource.getInstance(),getContext());
         mListViewModel = ViewModelProviders.of(FirstFragment.this, factory).get(FoodListViewModel.class);
         mListViewModel.getmFood().observe(this, new Observer<List<Food>>() {
             @Override
@@ -125,5 +155,52 @@ public class FirstFragment extends android.support.v4.app.Fragment{
             }
         });
         mListViewModel.refreshFoodData();
+    }
+
+    @Override
+    public Filter getFilter() {
+        if (foodFilter == null)
+            foodFilter = new FoodFilter();
+        return foodFilter;
+    }
+
+    class FoodFilter extends Filter {
+        private List<Food> copyList = new ArrayList<>();
+
+        public FoodFilter() {
+            copyList.addAll(mFoodAdapter.getFoodList());
+        }
+
+        @Override
+        protected FilterResults performFiltering(CharSequence constraint) {
+            FilterResults filterResults = new FilterResults();
+            if (constraint == null || constraint.length() == 0) {
+                filterResults.count = copyList.size();
+                filterResults.values = copyList;
+            } else {
+                List<Food> filteredList = new ArrayList<>();
+                for (Food food : copyList) {
+                    if (food.getTitle().contains(constraint)) {
+                        filteredList.add(food);
+                    }
+                }
+                if (filteredList.size() < 3) {
+                    mListViewModel.loadNextPageFood();
+                    for (Food food : copyList) {
+                        if (food.getTitle().contains(constraint)) {
+                            filteredList.add(food);
+                        }
+                    }
+                }
+                filterResults.values = filteredList;
+                filterResults.count = filteredList.size();
+            }
+            return filterResults;
+        }
+
+        @Override
+        protected void publishResults(CharSequence constraint, FilterResults results) {
+            mFoodAdapter.updateList((List<Food>) results.values);
+        }
     }
 }

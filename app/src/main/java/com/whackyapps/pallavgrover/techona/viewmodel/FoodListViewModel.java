@@ -8,6 +8,7 @@ import android.arch.lifecycle.MutableLiveData;
 import android.arch.lifecycle.Transformations;
 import android.arch.lifecycle.ViewModel;
 import android.arch.lifecycle.ViewModelProvider;
+import android.content.Context;
 import android.support.annotation.NonNull;
 
 import com.whackyapps.pallavgrover.techona.MyApplication;
@@ -25,10 +26,12 @@ public class FoodListViewModel extends AndroidViewModel {
     private final LiveData<List<Food>> mFood;
 
     private RemoteDataSource mFoodDataRespository = null;
+    private Context mContext;
 
-    private FoodListViewModel(Application application, RemoteDataSource girlsDataRepository) {
+    private FoodListViewModel(Application application, RemoteDataSource girlsDataRepository, Context context) {
         super(application);
         mFoodDataRespository = girlsDataRepository;
+        mContext=context;
         mFood = Transformations.switchMap(mFoodPageIndex, new Function<Integer, LiveData<List<Food>>>() {
             @Override
             public LiveData<List<Food>> apply(Integer input) {
@@ -45,11 +48,12 @@ public class FoodListViewModel extends AndroidViewModel {
         mFoodPageIndex.setValue(1);
     }
 
-    public void loadNextPageGirls() {
-//        if (!Util.isNetworkConnected(MyApplication.getInstance())) {
-//            return;
-//        }
-        mFoodPageIndex.setValue((mFoodPageIndex.getValue() == null ? 1 : mFoodPageIndex.getValue() + 1));
+    public void loadNextPageFood() {
+        if (!Util.isNetworkConnected(mContext)) {
+            return;
+        }
+        mFoodPageIndex.postValue((mFoodPageIndex.getValue() == null ? 1 : mFoodPageIndex.getValue() + 1));
+
     }
 
     public LiveData<Boolean> getLoadMoreState() {
@@ -63,14 +67,17 @@ public class FoodListViewModel extends AndroidViewModel {
 
         private final RemoteDataSource mFoodDataRespository;
 
-        public Factory(@NonNull Application application, RemoteDataSource mFoodDataRespository) {
+        private final Context mContext;
+
+        public Factory(@NonNull Application application, RemoteDataSource mFoodDataRespository,Context context) {
             mApplication = application;
             this.mFoodDataRespository = mFoodDataRespository;
+            mContext = context;
         }
 
         @Override
         public <T extends ViewModel> T create(Class<T> modelClass) {
-            return (T) new FoodListViewModel(mApplication, mFoodDataRespository);
+            return (T) new FoodListViewModel(mApplication, mFoodDataRespository,mContext);
         }
     }
 }

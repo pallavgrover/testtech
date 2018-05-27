@@ -23,13 +23,9 @@ public class RemoteDataSource implements DataSource {
 
     private final MutableLiveData<List<Food>> mFoodList;
 
-
-    private  ApiClient mApiClient;
-
     private ApiInterface apiService;
 
 
-    private String mZhihuPageDate;
 
     {
         mIsLoadingFood = new MutableLiveData<>();
